@@ -45,21 +45,14 @@ class MachineState {
 class Success extends ApiState {}
 
 class LibVirtApiModel extends ChangeNotifier {
+  LibVirtApiModel() {
+    getMachineState();
+  }
   MachineState? _machineState;
   MachineState? get machineState => _machineState;
   ApiState _apiState = Initial();
   ApiState get apiState => _apiState;
-  final baseURL = String.fromEnvironment('SERVER_URL',defaultValue: "http://localhost:8080");
-  void startVM() async {
-    _apiState = Loading();
-    final response = await http.get(Uri.parse("$baseURL/start"));
-    if(response.statusCode == 200) {
-      _apiState = Success();
-    } else {
-      _apiState = Error(message: response.body);
-    }
-    notifyListeners();
-  }
+  static const baseURL = String.fromEnvironment('SERVER_URL',defaultValue: "http://localhost:8080");
   void getMachineState() async {
     _apiState = Loading();
     final response = await http.get(Uri.parse("$baseURL/state"));
@@ -69,6 +62,51 @@ class LibVirtApiModel extends ChangeNotifier {
     } else {
       _apiState = Error(message: response.body);
     }
+    print(response.body);
+    notifyListeners();
+  }
+  void startVM() async {
+    _apiState = Loading();
+    final response = await http.get(Uri.parse("$baseURL/start"));
+    if(response.statusCode == 200) {
+      getMachineState();
+    } else {
+      _apiState = Error(message: response.body);
+    }
+    print(response.body);
+    notifyListeners();
+  }
+  void stopVM() async {
+    _apiState = Loading();
+    final response = await http.get(Uri.parse("$baseURL/stop"));
+    if(response.statusCode == 200) {
+      getMachineState();
+    } else {
+      _apiState = Error(message: response.body);
+    }
+    print(response.body);
+    notifyListeners();
+  }
+  void forceStopVM() async {
+    _apiState = Loading();
+    final response = await http.get(Uri.parse("$baseURL/forcestop"));
+    if(response.statusCode == 200) {
+      getMachineState();
+    } else {
+      _apiState = Error(message: response.body);
+    }
+    print(response.body);
+    notifyListeners();
+  }
+  void rebootVM() async {
+    _apiState = Loading();
+    final response = await http.get(Uri.parse("$baseURL/reboot"));
+    if(response.statusCode == 200) {
+      getMachineState();
+    } else {
+      _apiState = Error(message: response.body);
+    }
+    print(response.body);
     notifyListeners();
   }
 }
@@ -103,38 +141,45 @@ class ActionButton extends StatelessWidget {
   final String text;
   final IconData icon;
   final VoidCallback callback;
+  final bool enabled;
   const ActionButton({
     super.key,
     required this.callback,
     required this.text,
-    required this.icon
+    required this.icon,
+    this.enabled = true
   });
   @override
   Widget build(BuildContext ctx){
-    return Material(
-      child: InkWell(
-        onTap: () => callback(),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: Theme.of(ctx).colorScheme.primary,
-              size: 25,
-            ),
-            SizedBox(width: 6),
-            Text(
-              text,
-              style: TextStyle(
-                fontSize: 24,
-                color: Theme.of(ctx).colorScheme.onSurface,
-                fontWeight: FontWeight.w100
-              )
+    return Row(
+      children: [
+        Material(
+          child: InkWell(
+            onTap: enabled ? () => callback() : null,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  color: enabled ? Theme.of(ctx).colorScheme.primary : Colors.grey.withAlpha(178),
+                  size: 25,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 24,
+                    color: enabled ? Theme.of(ctx).colorScheme.onSurface : Colors.grey.withAlpha(178),
+                    fontWeight: FontWeight.w100
+                  ),
+                )
+              ],
             )
-          ],
-        )
-      )
+          )
+        ),
+        SizedBox(width: 20)
+      ]
     );
   }
 }
@@ -157,7 +202,7 @@ class MachineInfo extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurface
           )
         ),
-        SizedBox(width: 8),
+        SizedBox(width: 6),
         Text(
           info
         )
@@ -170,6 +215,10 @@ class HomePage extends StatelessWidget {
   const HomePage({super.key});
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<LibVirtApiModel>();
+    final isRunning = viewModel.machineState?.state == 1 || viewModel.machineState?.state == 2;
+    final isClickable = viewModel.machineState?.state != 0 && viewModel.machineState?.state != 4;
+    final isSleep = viewModel.machineState?.state != 3 || viewModel.machineState?.state != 7;
     return Scaffold(
       body: Padding(
         padding: EdgeInsets.symmetric(
@@ -181,22 +230,33 @@ class HomePage extends StatelessWidget {
             Row(
               children: [
                 ActionButton(
-                  icon: Icons.play_circle_outline,
-                  callback: () {},
-                  text: 'Start'
+                  icon: Icons.power_settings_new_outlined,
+                  callback: !isRunning ? () => viewModel.startVM() : () => viewModel.stopVM(),
+                  text: !isRunning ? 'Start' : 'Stop',
+                  enabled: isClickable && isSleep
                 ),
-                SizedBox(width: 8),
                 ActionButton(
                   icon: Icons.restart_alt,
-                  callback: () {},
-                  text: 'Reboot'
+                  callback: () => viewModel.rebootVM(),
+                  text: 'Reboot',
+                  enabled: isClickable && isRunning
                 ),
-                SizedBox(width: 8),
                 ActionButton(
-                  icon: Icons.power_settings_new_outlined,
+                  icon: Icons.power_off_outlined,
+                  callback: () => viewModel.forceStopVM(),
+                  text: 'Force stop',
+                  enabled: isClickable && isRunning || viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7
+                ),
+                ActionButton(
+                  icon: Icons.pause_circle_outlined,
                   callback: () {},
-                  text: 'Shutdown'
-                )
+                  text: 'Suspend'
+                ),
+                // ActionButton(
+                //   icon: Icons.play_circle_outlined,
+                //   callback: () {},
+                //   text: 'Resume'
+                // )
               ],
             ),
             Divider(
