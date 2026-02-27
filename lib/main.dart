@@ -87,8 +87,82 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: HomePage()
+      home: HomePage(),
+      title: 'Libvirt panel',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepOrange,
+          brightness: Brightness.dark
+        ),
+      ),
     );
+  }
+}
+
+class ActionButton extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final VoidCallback callback;
+  const ActionButton({
+    super.key,
+    required this.callback,
+    required this.text,
+    required this.icon
+  });
+  @override
+  Widget build(BuildContext ctx){
+    return Material(
+      child: InkWell(
+        onTap: () => callback(),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: Theme.of(ctx).colorScheme.primary,
+              size: 25,
+            ),
+            SizedBox(width: 6),
+            Text(
+              text,
+              style: TextStyle(
+                fontSize: 24,
+                color: Theme.of(ctx).colorScheme.onSurface,
+                fontWeight: FontWeight.w100
+              )
+            )
+          ],
+        )
+      )
+    );
+  }
+}
+
+class MachineInfo extends StatelessWidget {
+  final String title;
+  final String info; 
+  const MachineInfo({
+    super.key,
+    required this.title,
+    required this.info
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface
+          )
+        ),
+        SizedBox(width: 8),
+        Text(
+          info
+        )
+      ],
+    ); 
   }
 }
 
@@ -96,8 +170,45 @@ class HomePage extends StatelessWidget {
   const HomePage({super.key});
   @override
   Widget build(BuildContext context) {
-    return Column(
-
+    return Scaffold(
+      body: Padding(
+        padding: EdgeInsets.symmetric(
+          vertical: 16,
+          horizontal: 10,
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                ActionButton(
+                  icon: Icons.play_circle_outline,
+                  callback: () {},
+                  text: 'Start'
+                ),
+                SizedBox(width: 8),
+                ActionButton(
+                  icon: Icons.restart_alt,
+                  callback: () {},
+                  text: 'Reboot'
+                ),
+                SizedBox(width: 8),
+                ActionButton(
+                  icon: Icons.power_settings_new_outlined,
+                  callback: () {},
+                  text: 'Shutdown'
+                )
+              ],
+            ),
+            Divider(
+              thickness: 1,
+              color: Colors.grey,
+              indent: 0,
+              endIndent: 0
+            )
+          ],
+        )
+      ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
     );
   }
 }
