@@ -62,7 +62,6 @@ class LibVirtApiModel extends ChangeNotifier {
     } else {
       _apiState = Error(message: response.body);
     }
-    print(response.body);
     notifyListeners();
   }
   void startVM() async {
@@ -73,7 +72,6 @@ class LibVirtApiModel extends ChangeNotifier {
     } else {
       _apiState = Error(message: response.body);
     }
-    print(response.body);
     notifyListeners();
   }
   void stopVM() async {
@@ -84,7 +82,6 @@ class LibVirtApiModel extends ChangeNotifier {
     } else {
       _apiState = Error(message: response.body);
     }
-    print(response.body);
     notifyListeners();
   }
   void forceStopVM() async {
@@ -95,7 +92,6 @@ class LibVirtApiModel extends ChangeNotifier {
     } else {
       _apiState = Error(message: response.body);
     }
-    print(response.body);
     notifyListeners();
   }
   void rebootVM() async {
@@ -106,7 +102,26 @@ class LibVirtApiModel extends ChangeNotifier {
     } else {
       _apiState = Error(message: response.body);
     }
-    print(response.body);
+    notifyListeners();
+  }
+  void suspendVM() async {
+    _apiState = Loading();
+    final response = await http.get(Uri.parse("$baseURL/suspend"));
+    if(response.statusCode == 200) {
+      getMachineState();
+    } else {
+      _apiState = Error(message: response.body);
+    }
+    notifyListeners();
+  }
+  void resumeVM() async {
+    _apiState = Loading();
+    final response = await http.get(Uri.parse("$baseURL/resume"));
+    if(response.statusCode == 200) {
+      getMachineState();
+    } else {
+      _apiState = Error(message: response.body);
+    }
     notifyListeners();
   }
 }
@@ -248,15 +263,11 @@ class HomePage extends StatelessWidget {
                   enabled: isClickable && isRunning || viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7
                 ),
                 ActionButton(
-                  icon: Icons.pause_circle_outlined,
-                  callback: () {},
-                  text: 'Suspend'
+                  icon: viewModel.machineState?.state == 3 ? Icons.play_circle_outlined : Icons.pause_circle_outlined,
+                  callback: viewModel.machineState?.state == 3 ? () => viewModel.resumeVM() : () => viewModel.suspendVM(),
+                  text: viewModel.machineState?.state == 3 ? 'Resume' : 'Suspend',
+                  enabled: viewModel.machineState?.state == 1 || viewModel.machineState?.state == 3,
                 ),
-                // ActionButton(
-                //   icon: Icons.play_circle_outlined,
-                //   callback: () {},
-                //   text: 'Resume'
-                // )
               ],
             ),
             Divider(
