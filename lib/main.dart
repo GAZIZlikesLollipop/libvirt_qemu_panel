@@ -214,12 +214,19 @@ class MachineInfo extends StatelessWidget {
         Text(
           title,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(190),
+            fontSize: 24,
+            fontWeight: FontWeight.w100
           )
         ),
         SizedBox(width: 6),
         Text(
-          info
+          info,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 24,
+            fontWeight: FontWeight.w100
+          )
         )
       ],
     ); 
@@ -275,6 +282,39 @@ class HomePage extends StatelessWidget {
               color: Colors.grey,
               indent: 0,
               endIndent: 0
+            ),
+            SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: 
+                InkWell(
+                  onTap: (){},
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.refresh_outlined,
+                        color: Colors.blueGrey
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Refrush',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.blueGrey
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+            ),
+            SizedBox(height: 8),
+            Column(
+              children: [
+                MachineInfo(
+                  title: 'State',
+                   info: '${viewModel.machineState?.state}'
+                )
+              ],
             )
           ],
         )
