@@ -215,13 +215,14 @@ class MachineInfo extends StatelessWidget {
           title,
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurface.withAlpha(190),
+            inherit: false,
             fontSize: 24,
             fontWeight: FontWeight.w100
           )
         ),
         SizedBox(width: 6),
         Text(
-          info,
+          '- $info',
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurface,
             fontSize: 24,
@@ -284,28 +285,25 @@ class HomePage extends StatelessWidget {
               endIndent: 0
             ),
             SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: 
-                InkWell(
-                  onTap: (){},
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.refresh_outlined,
-                        color: Colors.blueGrey
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Refrush',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.blueGrey
-                        ),
-                      )
-                    ],
+            InkWell(
+              onTap: (){},
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.refresh_outlined,
+                    color: Colors.grey
                   ),
-                ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Refrush',
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: Colors.grey
+                    ),
+                   )
+                ],
+              ),
             ),
             SizedBox(height: 8),
             Column(
@@ -313,7 +311,23 @@ class HomePage extends StatelessWidget {
                 MachineInfo(
                   title: 'State',
                    info: '${viewModel.machineState?.state}'
-                )
+                ),
+                MachineInfo(
+                  title: 'Max Ram',
+                   info: '${viewModel.machineState?.maxRam}'
+                ),
+                MachineInfo(
+                  title: 'Free Ram',
+                   info: '${viewModel.machineState?.ram}'
+                ),
+                MachineInfo(
+                  title: 'Core Count',
+                   info: '${viewModel.machineState?.coreCount}'
+                ),
+                MachineInfo(
+                  title: 'Start Time',
+                   info: '${viewModel.machineState?.cpuTime}'
+                ),
               ],
             )
           ],
