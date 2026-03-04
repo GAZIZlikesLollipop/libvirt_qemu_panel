@@ -17,25 +17,36 @@ class Error extends ApiState {
 
 class MachineState {
   final int state;
-  final int maxRam;
-  final int ram;
+  final String memory;
   final int coreCount;
-  final int cpuTime;
+  final String cpuTime;
   const MachineState({
     required this.state,
-    required this.maxRam,
-    required this.ram,
+    required this.memory,
     required this.coreCount,
     required this.cpuTime,
   });
+  MachineState copyWith({
+    int? state,
+    String? memory,
+    String? ram,
+    int? coreCount,
+    String? cpuTime
+  }){
+    return MachineState(
+      state: state ?? this.state,
+      memory: memory ?? this.memory,
+      coreCount: coreCount ?? this.coreCount,
+      cpuTime: cpuTime ?? this.cpuTime
+    );
+  }
   factory MachineState.fromJson(Map<String, dynamic> json) {
     return switch(json) {
-      {'state': int state,'max_ram': int maxRam,'ram': int ram,'core_count': int coreCount,'cpu_time': int cpuTime} => MachineState(
+      {'state': int state,'memory': int memory,'core_count': int coreCount,'cpu_time': int cpuTime} => MachineState(
           state: state,
-          maxRam: maxRam, 
-          ram: ram, 
+          memory: '$memory', 
           coreCount: coreCount, 
-          cpuTime: cpuTime
+          cpuTime: '$cpuTime'
         ),
       _ => throw const FormatException('Ошибка преобразования MachineState')
     };
@@ -53,12 +64,24 @@ class LibVirtApiModel extends ChangeNotifier {
   ApiState _apiState = Initial();
   ApiState get apiState => _apiState;
   static const baseURL = String.fromEnvironment('SERVER_URL',defaultValue: "http://localhost:8080");
+  String fromKB(int bytes) {
+    String result = '$bytes KB';
+    if(bytes > 1024){
+      result = '${bytes/1024} MB';
+    }
+    return result;
+  }
   void getMachineState() async {
     _apiState = Loading();
     final response = await http.get(Uri.parse("$baseURL/state"));
     if(response.statusCode == 200) {
       _apiState = Success();
       _machineState = MachineState.fromJson(jsonDecode(response.body) as Map<String,dynamic>);
+      var date = DateTime.now().subtract(Duration(microseconds: int.parse(machineState?.cpuTime ?? '0') ~/ 1000)).toUtc();
+      _machineState = machineState?.copyWith(
+        cpuTime: '${date.day}/${date.month}/${date.year} ${date.hour < 10 ? '0${date.hour}' : date.hour}:${date.minute < 10 ? '0${date.minute}' : date.minute} UTC',
+        memory: fromKB(int.parse(machineState?.memory ?? '0')),
+      );
     } else {
       _apiState = Error(message: response.body);
     }
@@ -215,14 +238,22 @@ class MachineInfo extends StatelessWidget {
           title,
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurface.withAlpha(190),
-            inherit: false,
             fontSize: 24,
             fontWeight: FontWeight.w100
           )
         ),
         SizedBox(width: 6),
         Text(
-          '- $info',
+          ':',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(160),
+            fontSize: 22,
+            fontWeight: FontWeight.w100
+          )
+        ),
+        SizedBox(width: 6),
+        SelectableText(
+          info,
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurface,
             fontSize: 24,
@@ -238,6 +269,16 @@ class HomePage extends StatelessWidget {
   const HomePage({super.key});
   @override
   Widget build(BuildContext context) {
+    final states = {
+      0: "NoState",
+      1: "Running",
+      2: "Blocked",
+      3: "Paused",
+      4: "Shutting down",
+      5: "Off",
+      6: "Crashed",
+      7: "Suspended",
+    };
     final viewModel = context.watch<LibVirtApiModel>();
     final isRunning = viewModel.machineState?.state == 1 || viewModel.machineState?.state == 2;
     final isClickable = viewModel.machineState?.state != 0 && viewModel.machineState?.state != 4;
@@ -271,9 +312,9 @@ class HomePage extends StatelessWidget {
                   enabled: isClickable && isRunning || viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7
                 ),
                 ActionButton(
-                  icon: viewModel.machineState?.state == 3 ? Icons.play_circle_outlined : Icons.pause_circle_outlined,
-                  callback: viewModel.machineState?.state == 3 ? () => viewModel.resumeVM() : () => viewModel.suspendVM(),
-                  text: viewModel.machineState?.state == 3 ? 'Resume' : 'Suspend',
+                  icon: viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7 ? Icons.play_circle_outlined : Icons.pause_circle_outlined,
+                  callback: viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7 ? () => viewModel.resumeVM() : () => viewModel.suspendVM(),
+                  text: viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7 ? 'Resume' : 'Suspend',
                   enabled: viewModel.machineState?.state == 1 || viewModel.machineState?.state == 3,
                 ),
               ],
@@ -286,20 +327,20 @@ class HomePage extends StatelessWidget {
             ),
             SizedBox(height: 8),
             InkWell(
-              onTap: (){},
+              onTap: () => viewModel.getMachineState(),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.refresh_outlined,
-                    color: Colors.grey
+                    color: Colors.grey.withAlpha(190)
                   ),
                   SizedBox(width: 4),
                   Text(
                     'Refrush',
                     style: TextStyle(
                       fontSize: 20,
-                      color: Colors.grey
+                      color: Colors.grey.withAlpha(190)
                     ),
                    )
                 ],
@@ -310,15 +351,11 @@ class HomePage extends StatelessWidget {
               children: [
                 MachineInfo(
                   title: 'State',
-                   info: '${viewModel.machineState?.state}'
+                   info: '${states[viewModel.machineState?.state]}'
                 ),
                 MachineInfo(
-                  title: 'Max Ram',
-                   info: '${viewModel.machineState?.maxRam}'
-                ),
-                MachineInfo(
-                  title: 'Free Ram',
-                   info: '${viewModel.machineState?.ram}'
+                  title: 'Memory',
+                   info: '${viewModel.machineState?.memory}'
                 ),
                 MachineInfo(
                   title: 'Core Count',
