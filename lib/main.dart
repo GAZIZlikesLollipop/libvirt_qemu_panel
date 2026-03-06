@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 sealed class ApiState {}
 
@@ -16,25 +17,29 @@ class Error extends ApiState {
 }
 
 class MachineState {
-  final int state;
+  final String event;
+  final String detail;
   final String memory;
   final int coreCount;
   final String cpuTime;
   const MachineState({
-    required this.state,
+    required this.event,
+    required this.detail,
     required this.memory,
     required this.coreCount,
     required this.cpuTime,
   });
   MachineState copyWith({
-    int? state,
+    String? event,
+    String? detail,
     String? memory,
     String? ram,
     int? coreCount,
     String? cpuTime
   }){
     return MachineState(
-      state: state ?? this.state,
+      event: event ?? this.event,
+      detail: detail ?? this.detail,
       memory: memory ?? this.memory,
       coreCount: coreCount ?? this.coreCount,
       cpuTime: cpuTime ?? this.cpuTime
@@ -42,8 +47,15 @@ class MachineState {
   }
   factory MachineState.fromJson(Map<String, dynamic> json) {
     return switch(json) {
-      {'state': int state,'memory': int memory,'core_count': int coreCount,'cpu_time': int cpuTime} => MachineState(
-          state: state,
+      {
+        'event': String event,
+        'detail': String detail,
+        'memory': int memory,
+        'core_count': int coreCount,
+        'cpu_time': int cpuTime
+      } => MachineState(
+          event: event,
+          detail: detail,
           memory: '$memory', 
           coreCount: coreCount, 
           cpuTime: '$cpuTime'
@@ -57,13 +69,13 @@ class Success extends ApiState {}
 
 class LibVirtApiModel extends ChangeNotifier {
   LibVirtApiModel() {
-    getMachineState();
+    startStateListening();
   }
   MachineState? _machineState;
   MachineState? get machineState => _machineState;
   ApiState _apiState = Initial();
   ApiState get apiState => _apiState;
-  static const baseURL = String.fromEnvironment('SERVER_URL',defaultValue: "http://localhost:8080");
+  static const baseURL = String.fromEnvironment('SERVER_URL',defaultValue: "localhost:8080");
   String fromKB(int bytes) {
     String result = '$bytes KB';
     if(bytes > 1024){
@@ -71,80 +83,59 @@ class LibVirtApiModel extends ChangeNotifier {
     }
     return result;
   }
-  void getMachineState() async {
-    _apiState = Loading();
-    final response = await http.get(Uri.parse("$baseURL/state"));
-    if(response.statusCode == 200) {
-      _apiState = Success();
-      _machineState = MachineState.fromJson(jsonDecode(response.body) as Map<String,dynamic>);
+  final channel = WebSocketChannel.connect(
+    Uri.parse('ws://$baseURL/state'),
+  );
+  void startStateListening() async {
+    await channel.ready;
+    channel.stream.listen((msg){
+      _machineState = MachineState.fromJson(jsonDecode(msg) as Map<String,dynamic>);
       var date = DateTime.now().subtract(Duration(microseconds: int.parse(machineState?.cpuTime ?? '0') ~/ 1000)).toUtc();
       _machineState = machineState?.copyWith(
         cpuTime: '${date.day}/${date.month}/${date.year} ${date.hour < 10 ? '0${date.hour}' : date.hour}:${date.minute < 10 ? '0${date.minute}' : date.minute} UTC',
         memory: fromKB(int.parse(machineState?.memory ?? '0')),
       );
-    } else {
-      _apiState = Error(message: response.body);
-    }
-    notifyListeners();
+      notifyListeners();
+    });
   }
   void startVM() async {
     _apiState = Loading();
-    final response = await http.get(Uri.parse("$baseURL/start"));
-    if(response.statusCode == 200) {
-      getMachineState();
+    if(machineState != null) {
+      final response = await http.get(Uri.parse("http://$baseURL/start"));
+      if(response.statusCode != 200) {_apiState = Error(message: response.body); }
     } else {
-      _apiState = Error(message: response.body);
+      channel.sink.add('give me data!');
     }
     notifyListeners();
   }
   void stopVM() async {
     _apiState = Loading();
-    final response = await http.get(Uri.parse("$baseURL/stop"));
-    if(response.statusCode == 200) {
-      getMachineState();
-    } else {
-      _apiState = Error(message: response.body);
-    }
+    final response = await http.get(Uri.parse("http://$baseURL/stop"));
+    if(response.statusCode != 200) {_apiState = Error(message: response.body); }
     notifyListeners();
   }
   void forceStopVM() async {
     _apiState = Loading();
-    final response = await http.get(Uri.parse("$baseURL/forcestop"));
-    if(response.statusCode == 200) {
-      getMachineState();
-    } else {
-      _apiState = Error(message: response.body);
-    }
+    final response = await http.get(Uri.parse("http://$baseURL/forcestop"));
+    if(response.statusCode != 200) {_apiState = Error(message: response.body); }
     notifyListeners();
   }
   void rebootVM() async {
     _apiState = Loading();
-    final response = await http.get(Uri.parse("$baseURL/reboot"));
-    if(response.statusCode == 200) {
-      getMachineState();
-    } else {
-      _apiState = Error(message: response.body);
-    }
+    final response = await http.get(Uri.parse("http://$baseURL/reboot"));
+    if(response.statusCode != 200) {_apiState = Error(message: response.body); }
     notifyListeners();
   }
   void suspendVM() async {
     _apiState = Loading();
-    final response = await http.get(Uri.parse("$baseURL/suspend"));
-    if(response.statusCode == 200) {
-      getMachineState();
-    } else {
-      _apiState = Error(message: response.body);
-    }
+    final response = await http.get(Uri.parse("http://$baseURL/suspend"));
+    if(response.statusCode != 200) {_apiState = Error(message: response.body); }
     notifyListeners();
   }
   void resumeVM() async {
     _apiState = Loading();
-    final response = await http.get(Uri.parse("$baseURL/resume"));
-    if(response.statusCode == 200) {
-      getMachineState();
-    } else {
-      _apiState = Error(message: response.body);
-    }
+    final response = await http.get(Uri.parse("http://$baseURL/resume"));
+    if(response.statusCode != 200) {_apiState = Error(message: response.body); }
     notifyListeners();
   }
 }
@@ -269,20 +260,13 @@ class HomePage extends StatelessWidget {
   const HomePage({super.key});
   @override
   Widget build(BuildContext context) {
-    final states = {
-      0: "NoState",
-      1: "Running",
-      2: "Blocked",
-      3: "Paused",
-      4: "Shutting down",
-      5: "Off",
-      6: "Crashed",
-      7: "Suspended",
-    };
     final viewModel = context.watch<LibVirtApiModel>();
-    final isRunning = viewModel.machineState?.state == 1 || viewModel.machineState?.state == 2;
-    final isClickable = viewModel.machineState?.state != 0 && viewModel.machineState?.state != 4 && viewModel.apiState is! Loading;
-    final isSleep = viewModel.machineState?.state != 3 || viewModel.machineState?.state != 7;
+    final isRunning = viewModel.machineState?.event == 'Started' || 
+                      viewModel.machineState?.event == 'Resumed';
+    final isClickable = viewModel.machineState?.event != 'Undefined' && 
+                        viewModel.machineState?.event != 'Crashed';
+    final isSleep = viewModel.machineState?.event == 'Suspended' || 
+        viewModel.machineState?.event == 'Pmsuspended';
     return Scaffold(
       body: Padding(
         padding: EdgeInsets.symmetric(
@@ -297,7 +281,7 @@ class HomePage extends StatelessWidget {
                   icon: Icons.power_settings_new_outlined,
                   callback: !isRunning ? () => viewModel.startVM() : () => viewModel.stopVM(),
                   text: !isRunning ? 'Start' : 'Stop',
-                  enabled: isClickable && isSleep 
+                  enabled: isClickable || isSleep 
                 ),
                 ActionButton(
                   icon: Icons.restart_alt,
@@ -309,13 +293,21 @@ class HomePage extends StatelessWidget {
                   icon: Icons.power_off_outlined,
                   callback: () => viewModel.forceStopVM(),
                   text: 'Force stop',
-                  enabled: isClickable && isRunning || viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7
+                  enabled: isClickable && isRunning || 
+                          viewModel.machineState?.event == 'Suspended' || 
+                          viewModel.machineState?.event == 'Pmsuspended',
                 ),
                 ActionButton(
-                  icon: viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7 ? Icons.play_circle_outlined : Icons.pause_circle_outlined,
-                  callback: viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7 ? () => viewModel.resumeVM() : () => viewModel.suspendVM(),
-                  text: viewModel.machineState?.state == 3 || viewModel.machineState?.state == 7 ? 'Resume' : 'Suspend',
-                  enabled: viewModel.machineState?.state == 1 || viewModel.machineState?.state == 3,
+                  icon: viewModel.machineState?.event == 'Suspended' || viewModel.machineState?.event == 'Pmsuspended' 
+                      ? Icons.play_circle_outlined 
+                      : Icons.pause_circle_outlined,
+                  callback: viewModel.machineState?.event == 'Suspended' || viewModel.machineState?.event == 'Pmsuspended' 
+                      ? () => viewModel.resumeVM() 
+                      : () => viewModel.suspendVM(),
+                  text: viewModel.machineState?.event == 'Suspended' || viewModel.machineState?.event == 'Pmsuspended' 
+                      ? 'Resume' 
+                      : 'Suspend',
+                  enabled: isClickable && viewModel.machineState?.event == 'Started' || viewModel.machineState?.event == 'Suspended' || viewModel.machineState?.event == 'Resumed',
                 ),
               ],
             ),
@@ -326,44 +318,23 @@ class HomePage extends StatelessWidget {
               endIndent: 0
             ),
             SizedBox(height: 8),
-            InkWell(
-              onTap: () => viewModel.getMachineState(),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.refresh_outlined,
-                    color: Colors.grey.withAlpha(190)
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    'Refrush',
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: Colors.grey.withAlpha(190)
-                    ),
-                   )
-                ],
-              ),
-            ),
-            SizedBox(height: 8),
             Column(
               children: [
                 MachineInfo(
                   title: 'State',
-                   info: '${states[viewModel.machineState?.state]}'
+                  info: (viewModel.machineState?.detail ?? "Unknown").isNotEmpty ? '${viewModel.machineState?.event} (${viewModel.machineState?.detail})' : '${viewModel.machineState?.event}',
                 ),
                 MachineInfo(
                   title: 'Memory',
-                   info: '${viewModel.machineState?.memory}'
+                  info: '${viewModel.machineState?.memory}'
                 ),
                 MachineInfo(
                   title: 'Core Count',
-                   info: '${viewModel.machineState?.coreCount}'
+                  info: '${viewModel.machineState?.coreCount}'
                 ),
                 MachineInfo(
                   title: 'Start Time',
-                   info: '${viewModel.machineState?.cpuTime}'
+                  info: '${viewModel.machineState?.cpuTime}'
                 ),
               ],
             )
