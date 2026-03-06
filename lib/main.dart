@@ -281,7 +281,7 @@ class HomePage extends StatelessWidget {
     };
     final viewModel = context.watch<LibVirtApiModel>();
     final isRunning = viewModel.machineState?.state == 1 || viewModel.machineState?.state == 2;
-    final isClickable = viewModel.machineState?.state != 0 && viewModel.machineState?.state != 4;
+    final isClickable = viewModel.machineState?.state != 0 && viewModel.machineState?.state != 4 && viewModel.apiState is! Loading;
     final isSleep = viewModel.machineState?.state != 3 || viewModel.machineState?.state != 7;
     return Scaffold(
       body: Padding(
@@ -297,7 +297,7 @@ class HomePage extends StatelessWidget {
                   icon: Icons.power_settings_new_outlined,
                   callback: !isRunning ? () => viewModel.startVM() : () => viewModel.stopVM(),
                   text: !isRunning ? 'Start' : 'Stop',
-                  enabled: isClickable && isSleep
+                  enabled: isClickable && isSleep 
                 ),
                 ActionButton(
                   icon: Icons.restart_alt,
